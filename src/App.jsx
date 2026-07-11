@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { LocateFixed, Sparkles, MapPinned, AlertCircle } from 'lucide-react'
+import { useMemo, useState, useEffect } from 'react'
+import { LocateFixed, Sparkles, MapPinned, AlertCircle, ShieldQuestion } from 'lucide-react'
 import { mockPlaces, savedMockIds } from './data/mockPlaces'
 import { budgetOptions, ratingOptions, transportOptions, travelOptions, typeOptions } from './data/options'
 import { parseAiQuery } from './lib/aiParser'
@@ -26,9 +26,10 @@ export default function App() {
   const [filters, setFilters] = useState(initialFilters)
   const [sortBy, setSortBy] = useState('match')
   const [saved, setSaved] = useState(savedMockIds)
-  const [showAi, setShowAi] = useState(true)
+  const [showAi, setShowAi] = useState(false)
   const [loading, setLoading] = useState(false)
   const [geoError, setGeoError] = useState('')
+  const [geoPromptVisible, setGeoPromptVisible] = useState(true)
 
   const parsed = useMemo(() => parseAiQuery(query), [query])
 
@@ -42,6 +43,11 @@ export default function App() {
 
   const restriction = useMemo(() => findRestrictiveFilter(mockPlaces, filters), [filters])
 
+  useEffect(() => {
+    const value = window.localStorage.getItem('bite_geo_prompt_seen')
+    if (value === 'true') setGeoPromptVisible(false)
+  }, [])
+
   const handleUseLocation = () => {
     setGeoError('')
     if (!navigator.geolocation) {
@@ -53,13 +59,22 @@ export default function App() {
       () => {
         setLocation('Текущая геолокация · Астана')
         setLoading(false)
+        setGeoPromptVisible(false)
+        window.localStorage.setItem('bite_geo_prompt_seen', 'true')
       },
       () => {
         setGeoError('Нет доступа к геолокации.')
         setLoading(false)
+        setGeoPromptVisible(false)
+        window.localStorage.setItem('bite_geo_prompt_seen', 'true')
       },
       { enableHighAccuracy: true, timeout: 5000 }
     )
+  }
+
+  const dismissGeoPrompt = () => {
+    setGeoPromptVisible(false)
+    window.localStorage.setItem('bite_geo_prompt_seen', 'true')
   }
 
   const applyAiFilters = () => {
@@ -71,6 +86,7 @@ export default function App() {
       maxTravel: parsed.max_travel_minutes,
     }))
     setScreen('discover')
+    setShowAi(false)
   }
 
   const toggleSave = (id) => {
@@ -81,6 +97,28 @@ export default function App() {
 
   return (
     <div className="mx-auto min-h-screen max-w-md bg-soft px-4 pb-28 pt-5 text-ink">
+      {geoPromptVisible && (
+        <div className="mb-4 rounded-3xl border border-line bg-white p-4 shadow-card">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-lime text-ink">
+              <ShieldQuestion size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold">Использовать геолокацию?</h3>
+              <p className="text-sm text-muted">Это улучшит точность рекомендаций и время в пути.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleUseLocation} className="flex-1 rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-white">
+              Разрешить
+            </button>
+            <button onClick={dismissGeoPrompt} className="flex-1 rounded-2xl bg-soft px-4 py-3 text-sm font-medium text-ink">
+              Позже
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="mb-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
